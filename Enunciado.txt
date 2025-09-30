@@ -1,0 +1,162 @@
+Enunciado:
+ Este ejercicio tiene como objetivo principal practicar threads, el manejo de los recursos compartidos, race conditions y deadlocks en C++.
+
+Tanto el enunciado como los casos de prueba públicos estan disponibles para ser descargados.
+
+Para este ejercicio se usara el siguiente MakefileThreads y un archivo adicional llamado common_wrap_socket que debe ser puesto junto con el resto de los archivos fuente. El objetivo es que se generen artificialmente problemas de red entre el cliente y servidor para testear las comunicaciones.
+
+El MakefileThreads compilará todos los archivos C++ provistos y enlazará (linker) los archivos common_* y client_* para formar el binario client y los archivos common_* y server_* para formar el binario server.
+
+Por ejemplo
+
+common_sockets.cpp, client_main.cpp -> client
+
+common_sockets.cpp, server_main.cpp -> server
+
+Es importante que respetes la nomenclatura de los archivos para que el Sercom te acepte y compile la entrega. Otro esquema no funcionará.
+
+Podes compilar tu TP como
+
+make -f MakefileThreads
+o como
+
+make -f MakefileThreads wrapsocks=1
+Con esta última versión tu código se linkeara con common_wrap_socket para que tu TP tenga "problemas de red" y asi podras probar tu TP para hacerlo mas robusto. Si programaste bien el TDA/clase Socket no tendras problemas.
+
+Tu código deberá estar formateado con el estilo correcto, usando clang-format, y con los errores marcados por los analizadores estáticos cpplint y cppcheck corregidos. Podes correr esas herramientas localmente con pre-commit. Solo luego se ejecutaran las pruebas automáticas sin y con valgrind.
+
+Descripción
+En esta PoC modelamos el comportamiento del uso de nitro para que los autos corran con máxima
+velocidad. El servidor iniciará una única partida, a la cual se unirán los jugadores. Éstos podrán activar el
+nitro en sus carros, haciendo que su velocidad aumente significativamente por unos segundos.
+Cada vez que se activa o expira el nitro de un auto, el servidor deberá enviarle un mensaje a todos los
+clientes conectados indicando el evento sucedido.
+Ante estos eventos, tanto los clientes como el servidor imprimirán, según el caso:
+- A car hit the nitro!
+- A car is out of juice.
+Por simplicidad, no se imprimirá el nombre del auto o del usuario asociado al evento.
+Acciones del cliente
+Cada cliente deberá leer de entrada estándar que acciones va a realizar. Estas son:
+- nitro: el cliente deberá enviar un mensaje al servidor indicando su intención de activar el nitro.
+- read <n>: el cliente espera a recibir <n> mensajes del servidor, imprimiendolos a medida que llegan.
+- exit: el cliente debe finalizar.
+En una implementación real el cliente estaría enviando y recibiendo mensajes de forma asincrónica y
+concurrentemente pero para esta PoC vamos a simplificar el diseño: el cliente debe tener un único thread
+(el main).
+Ante cada mensaje que el cliente envía, este no espera respuesta. Es solo cuando ejecuta read <n> que
+espera por exactamente <n> mensajes desde el servidor.
+Requerimientos del servidor
+La lógica del juego deberá ejecutarse en un único thread que corra un gameloop. Este hilo correrá el
+siguiente loop 4 veces cada segundo.
+1. Leer todos los comandos pendientes de los clientes y ejecutarlos (activar los nitro). Si un cliente
+cuyo coche tiene el nitro activado, intenta acelerar su auto, se ignorará el pedido sin modificar el
+estado del auto.
+Es importante remarcar que el gameloop no debe bloquearse. Para esto, los clientes enviarán sus
+comandos al gameloop a través de una única queue del gameloop.
+2. Simular una iteración en el mundo del juego. En este paso, los autos deberán desactivar el nitro si
+pasaron 3 segundos desde la activación del mismo. Notar que 3 segundos es equivalente a 12
+iteraciones del gameloop.
+3. Enviar los mensajes a los clientes. Cada vez que se activa o desactiva el nitro de un vehículo, se
+deben enviar los mensajes a todos los clientes, e imprimir por pantalla lo sucedido. Es un
+broadcast! Este paso puede ejecutarse dentro de los pasos 1 y 2, o luego de haber ejecutado los
+comandos y simulado la iteración.
+Es posible que uno o varios jugadores no puedan recibir el mensaje exactamente en ese momento y
+por ende skt.send se bloqueara del lado del servidor. Pero el gameloop no puede bloquearse!
+Es por esto que cada cliente en el servidor deberá tener una queue de mensajes a enviar a través
+del socket.
+4. Sleep. Dado que queremos que hayan 4 loops por cada segundo, se pedirá que sólamente aquí y
+en ningún otro lugar del código agreguen un sleep.
+Nota: En este trabajo, por simplificación, haremos un sleep de 250 milisegundos luego de cada
+loop. Esto no es correcto si buscamos exactamente 4 loops por segundo, dado que los pasos 1, 2 y 3
+también consumen tiempo real.
+Además, el servidor deberá tener 2 threads por cada cliente conectado: un thread será el encargado de
+recibir por socket los mensajes del cliente y el otro de enviarlos hacia el cliente.
+El thread recibidor agregará comandos a la única queue del gameloop y el thread enviador leerá mensajes
+de su queue para enviar al cliente.
+Estas queues deberán ser thread-safe para prevenir las RC entre el gameloop y los hilos recibidor y enviador
+respectivamente. Es decisión del alumno qué tipo de queue usar (blocking/nonblocking,
+bounded/unbounded) y deberá justificarlo.
+El servidor puede tener threads adicionales como el thread Aceptador y el main.
+Estas queues no nos previenen de todas las RC: como también se permite que los clientes se unan y retiren
+de la partida en distintos tiempos, hay que agregar o remover la queue de cada cliente de una “lista de
+queues” (o "del mapping de queues") y como esta está compartida entre threads deberá protegerse con
+un monitor. Recordá que el gameloop recorrerá esta lista para hacer un broadcast.
+El servidor debe estar leyendo de la entrada estándar a la espera de leer la letra q que le indica que debe
+finalizar cerrando todos los sockets, queues y joinenando todos los threads sin enviar ningún mensaje
+adicional ni imprimir por salida estándar.
+
+En la imagen se presenta un diagrama de arquitectura para un sistema cliente-servidor, centrándose en la comunicación y el procesamiento de comandos. A continuación, se detalla cada componente:
+Nivel Superior: Server (Servidor)
+El servidor es el componente central que gestiona la lógica del juego y la comunicación con los clientes. Dentro del servidor, se identifican las siguientes secciones principales:
+Comunicaciones con los Clientes (Dotted Box Grande): Esta sección se encarga de manejar la interacción con cada cliente conectado. Se divide en sub-componentes para cada cliente:
+Cliente A y Cliente B (y potencialmente más): Cada cliente tiene su propio conjunto de hilos de comunicación dentro del servidor.
+receiver (Receptor): Este es un hilo (thread) dentro del servidor dedicado a escuchar y recibir mensajes (send) del main thread de un cliente específico (ej. "Client A"). La flecha send indica que el cliente envía datos al receptor del servidor. La barra vertical morada parece representar la vida útil o el estado activo de este hilo.
+sender (Enviador): Este es otro hilo dentro del servidor que se encarga de enviar mensajes (recv) de vuelta al main thread de un cliente específico (ej. "Client A"). Hay un componente "Server Msg" (Mensaje del Servidor) en forma de cilindro rojo, lo que sugiere una cola o búfer de mensajes que el servidor desea enviar a ese cliente. El sender toma mensajes de esta cola y los envía al cliente. La flecha recv indica que el cliente recibe datos del enviador del servidor.
+Comentarios del Servidor (Nube de Texto): "Acá estará el thread Aceptador y el main. También deberás ver qué recursos son compartidos y protegerlos."
+Esto indica que el servidor tendrá un "thread Aceptador" (probablemente para aceptar nuevas conexiones de clientes) y un "main" thread (el hilo principal del servidor).
+También enfatiza la importancia de identificar y proteger los "recursos compartidos", lo que es crucial en programación concurrente para evitar condiciones de carrera y asegurar la integridad de los datos.
+Procesamiento de Comandos (Dotted Box Inferior Derecha):
+Client Commands (Comandos del Cliente): Un cilindro rojo que representa una cola de comandos que han sido recibidos de todos los clientes y están esperando ser procesados por la lógica del juego.
+gamelop (Gameloop): Este es el hilo o proceso principal que lee comandos de la cola Client Commands y ejecuta la lógica del juego en consecuencia. La barra vertical morada indica su actividad continua.
+Nivel Inferior: Client A y Client B (Clientes)
+Cada cliente representa una instancia de un programa de juego ejecutándose en la máquina de un usuario. Ambos "Client A" y "Client B" tienen la misma estructura:
+main (Principal): Este es el hilo principal de la aplicación cliente.
+Envía mensajes (send) al receiver del servidor.
+Recibe mensajes (recv) del sender del servidor.
+La barra vertical morada con flechas de doble sentido indica el flujo de ejecución y las interacciones de envío/recepción dentro del hilo principal del cliente.
+Flujo de Comunicación y Procesamiento General:
+Cliente envía comando: El main thread de un cliente (ej. "Client A") genera un comando o una acción y lo send al receiver correspondiente en el servidor.
+Servidor recibe y encola comando: El receiver en el servidor recibe el mensaje del cliente y, presumiblemente, lo coloca en la cola Client Commands.
+Gameloop procesa comando: El gamelop del servidor toma comandos de la cola Client Commands y ejecuta la lógica del juego.
+Servidor genera respuesta: Como resultado de la lógica del juego, el servidor puede generar mensajes (Server Msg) destinados a uno o varios clientes. Estos mensajes se colocan en la cola Server Msg del cliente apropiado.
+Servidor envía respuesta: El sender correspondiente en el servidor toma el Server Msg de su cola y lo send al main thread del cliente.
+Cliente recibe respuesta: El main thread del cliente recv el mensaje del servidor y actualiza su estado o interfaz de usuario.
+En resumen, la imagen describe una arquitectura concurrente donde el servidor utiliza múltiples hilos (receiver, sender, gamelop, Aceptador, main) para manejar la comunicación con múltiples clientes y procesar la lógica del juego de manera eficiente, haciendo hincapié en la gestión de colas de mensajes para desacoplar las operaciones y la necesidad de proteger recursos compartidos.
+Protocolo
+El cliente podrá enviar un único mensaje:
+0x04 donde 0x04 es un byte con el número literal 0x04.
+El servidor también enviará un único mensaje:
+0x10 <cars-with-nitro> <nitro-activated|nitro-expired>, donde <cars-with-nitro> es un entero sin signo de dos bytes en big endian que indica la cantidad de autos con nitro activo, y el tercer parámetro es un byte con el literal 0x07 si se activó el nitro en un auto, y el literal 0x08 si se desactivó el nitro en un auto.
+Formato de Línea de Comandos
+./client <hostname o IP> <servicename o puerto>
+./server <servicename o puerto>
+Códigos de Retorno
+Tanto el cliente como el servidor deberán retornar 1 si hay algún problema con los argumentos del programa o 0 en otro caso.
+Ejemplo de Ejecución
+Lanzamos el servidor:
+./server 8080
+Y lanzamos el cliente A:
+./client 127.0.0.1 8080
+En este punto, el cliente ya se conectó al servidor.
+Escribimos el comando nitro en el cliente A. En la salida estándar del servidor vemos el mensaje:
+A car hit the nitro!
+En la salida estándar del cliente A no vemos ese mensaje. Si ahora le damos el comando read 1 al cliente A, ahí se imprimirá dicho mensaje:
+A car hit the nitro!
+Un segundo cliente, el cliente B, se conecta al servidor y le damos el comando read 1. Tanto el servidor como el cliente B imprimirán el siguiente mensaje una vez que pasen 3 segundos luego de que el cliente A haya activado el nitro.
+A car is out of juice.
+Podemos escribir read 2 en el cliente B, haciendo que éste se quede bloqueado.
+Si ahora escribimos múltiples veces nitro en el cliente A, sólo el primer mensaje es procesado por el servidor, mientras que el resto de los mensajes se descartan, dado que éstos llegan previo a que se cumplan 3 segundos desde el primer nitro.
+El cliente B y el servidor imprimirán por pantalla.
+A car hit the nitro!
+Y luego de 3 segundos, imprimirán.
+A car is out of juice.
+Si le damos el comando exit tanto al cliente A como al B ambos terminan.
+Si escribimos en la entrada estándar del servidor la letra q, este finaliza.
+Recomendaciones
+Los siguientes lineamientos son claves para acelerar el proceso de desarrollo sin pérdida de calidad:
+Repasar las recomendaciones de los TPs pasados y repasar los temas de la clase. Los videos, las diapositivas, los handouts, las guías, los ejemplos, los tutoriales.
+Verificar siempre con la documentación oficial cuando un objeto o método es thread safe. No suponer.
+Hacer algún diagrama muy simple que muestre cuales son los objetos compartidos entre los threads y asegurarse que estén protegidos con un monitor o bien sean thread safe o constantes. Hay veces que la solución más simple es no tener un objeto compartido sino tener un objeto privado por cada hilo.
+Asegúrate de determinar cuales son las critical sections. Recordá que por que pongas mutex y locks por todos lados harás tu código thread safe. ¡Repasar los temas de la clase!
+¡Programar por bloques! No programes todo el TP y esperes que funcione. ¡Menos aún si es un programa multithreading!
+Dividir el TP en bloques, codearlos, testearlos por separado y luego ir construyendo hacia arriba. Solo al final agregar la parte de multithreading y tener siempre la posibilidad de “deshabilitarlo” (como algún parámetro para usar 1 solo hilo por ejemplo).
+¡Debuggear un programa single-thread es mucho más fácil!
+Escribí código claro, sin saltos en niveles de abstracción, y que puedas leer entendiendo qué está pasando. Si editás el código “hasta que funciona” y cuando funcionó lo dejás así, buscá la explicación de por qué anduvo.
+Usa RAII, move semantics y referencias. Evita las copias a toda costa y punteros e instancia los objetos en stack. Las copias y los punteros no son malos, pero deberían ser la excepción y no la regla.
+No te compliques la vida con diseños complejos. Cuanto más fácil sea tu diseño, mejor.
+Usa las tools! Corre cppcheck y valgrind a menudo para cazar los errores rápido y usa algún debugger para resolverlos (GDB u otro, el que más te guste, lo importante es que uses un debugger)
+Restricciones
+La siguiente es una lista de restricciones técnicas exigidas por el cliente:
+El sistema debe desarrollarse en C++17 con el estándar POSIX 2008.
+Está prohibido el uso de variables globales, funciones globales y goto. Para el manejo de errores usar excepciones y no retornar códigos de error.
+Todo socket utilizado en este TP debe ser bloqueante (es el comportamiento por defecto) y no puede usarse sleep() o similar para la sincronización de los threads salvo expresa autorización del enunciado.

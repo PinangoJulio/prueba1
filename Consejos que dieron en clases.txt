@@ -1,0 +1,27 @@
+Podemos usar Queues en algunos casos
+identificar al  cliente por el socket (En este TP no vamos a poder
+usar el "username" tenemos que tener el client y apenas se conecte
+creamos por ejemplo un id interno del server para poder identificarlo
+Un único hilo en el cliente
+El loop tiene un sleep
+Se procesan todos los comandos, simulamos un Delta tiempo y browcasteamos
+El cliente solo manda 1 byte cuando quiere activar el nitro y se queda esperando al servidor luego se llama al receive all para escuchar un único mensaje
+Si se manda nitro 1 vez se debe esperar 3 segundos todo lo del medio SE DEBE IGNORAR. Hasta que pasen esos 3 segundos ahí recién se puede volver a activar
+Hay que procesarlo como cuadros de una pelicula
+Usar una Queue No bloqueante en el gameloop
+hay que hacer una Queue acotada
+Hay que plantear y hacer bien esta función: 
+class Receiver : public Thread {
+    Socket &peer;
+    void run() {
+        while (...) {
+            messages = peer.recv();
+            queue.push(messages);
+        }
+    }
+}
+
+
+
+
+
