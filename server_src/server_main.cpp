@@ -17,9 +17,6 @@ int main(int argc, const char* argv[]) {
 
     try {
         Server server(port);
-        
-        std::cout << "Server started" << std::endl;
-        
         server.start();
         
         // Esperar a que se ingrese 'q' para detener

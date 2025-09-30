@@ -13,25 +13,34 @@ Server::Server(const std::string& port):
 void Server::start() {
     running = true;
     
+    // Iniciar thread gameloop PRIMERO
+    gameloop_thread = Thread([this]() { this->gameloop(); });
+    
     // Iniciar thread acceptor
     acceptor_thread = Thread([this]() { this->acceptor_loop(); });
-    
-    // Iniciar thread gameloop
-    gameloop_thread = Thread([this]() { this->gameloop(); });
 }
 
 void Server::stop() {
     running = false;
     
+    // Cerrar el socket acceptor para que acepte salga
+    try {
+        acceptor_socket.shutdown(2);
+    } catch (...) {
+        // Ignorar errores al cerrar
+    }
+    
     // Cerrar queue de comandos
     game_commands.close();
     
     // Detener todos los clientes
-    std::unique_lock<std::mutex> lock(clients_mutex);
-    for (auto& client : clients) {
-        client->stop();
+    {
+        std::unique_lock<std::mutex> lock(clients_mutex);
+        for (auto& client : clients) {
+            client->stop();
+        }
+        clients.clear();
     }
-    clients.clear();
 }
 
 void Server::wait_for_finish() {
@@ -46,9 +55,7 @@ void Server::acceptor_loop() {
             Socket client_socket = acceptor_socket.accept();
             add_client(std::move(client_socket));
         } catch (const std::exception& e) {
-            if (running) {
-                std::cerr << "Acceptor error: " << e.what() << std::endl;
-            }
+            // Cuando se hace shutdown, accept lanza excepción
             break;
         }
     }
@@ -80,13 +87,16 @@ void Server::gameloop() {
         simulate_world();
         
         // Paso 4: Sleep (ÚNICO lugar con sleep en el servidor)
-        std::this_thread::sleep_for(std::chrono::milliseconds(GAMELOOP_SLEEP_MS));
+        // Usar sleep más corto y checkear running para salir rápido
+        for (int i = 0; i < 25 && running; i++) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
     }
 }
 
 void Server::process_commands() {
     // Leer TODOS los comandos pendientes (non-blocking)
-    while (true) {
+    while (running) {
         std::optional<GameCommand> cmd = game_commands.try_pop();
         
         if (!cmd.has_value()) {
