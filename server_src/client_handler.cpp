@@ -1,5 +1,7 @@
 #include "client_handler.h"
+
 #include <iostream>
+#include <utility>
 
 ClientHandler::ClientHandler(int id, Socket skt, NonBlockingQueue<GameCommand>& game_queue):
         client_id(id),
@@ -10,19 +12,13 @@ ClientHandler::ClientHandler(int id, Socket skt, NonBlockingQueue<GameCommand>& 
 
 void ClientHandler::start() {
     running = true;
-    
-    // Iniciar thread receiver
     receiver_thread = Thread([this]() { this->receiver_loop(); });
-    
-    // Iniciar thread sender
     sender_thread = Thread([this]() { this->sender_loop(); });
 }
 
 void ClientHandler::stop() {
     running = false;
     send_queue.close();
-    
-    // Los threads se joinean automáticamente en el destructor de Thread
 }
 
 //////////////////////// THREAD RECEIVER ////////////////////////
@@ -31,16 +27,14 @@ void ClientHandler::receiver_loop() {
     try {
         while (running) {
             uint8_t cmd = protocol.receive_command();
-            
+
             if (cmd == CMD_ACTIVATE_NITRO) {
-                // Pushear comando a la queue del gameloop
                 GameCommand game_cmd;
                 game_cmd.client_id = client_id;
                 game_commands.push(std::move(game_cmd));
             }
         }
     } catch (const std::exception& e) {
-        // Cliente se desconectó o error de socket
         running = false;
     }
 }
@@ -51,21 +45,18 @@ void ClientHandler::sender_loop() {
     try {
         while (running) {
             std::optional<NitroEvent> event = send_queue.pop();
-            
+
             if (!event.has_value()) {
-                break;  // Queue cerrada
+                break;
             }
-            
+
             protocol.send_nitro_event(event.value());
         }
     } catch (const std::exception& e) {
-        // Error de socket
         running = false;
     }
 }
 
 //////////////////////// ENVIAR EVENTO ////////////////////////
 
-void ClientHandler::send_event(const NitroEvent& event) {
-    send_queue.push(NitroEvent(event));
-}
+void ClientHandler::send_event(const NitroEvent& event) { send_queue.push(NitroEvent(event)); }

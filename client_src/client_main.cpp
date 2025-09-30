@@ -1,5 +1,6 @@
-#include <iostream>
 #include <exception>
+#include <iostream>
+
 #include "client.h"
 
 #define EXPECTED_ARGC 3

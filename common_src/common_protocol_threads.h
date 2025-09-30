@@ -2,25 +2,31 @@
 #define COMMON_PROTOCOL_THREADS_H
 
 #include <cstdint>
-#include <arpa/inet.h>
-#include "common_socket.h"
 #include <stdexcept>
 
-// Constantes del protocolo de threads
-#define CMD_ACTIVATE_NITRO 0x04
-#define CMD_NITRO_EVENT 0x10
-#define EVENT_NITRO_ACTIVATED 0x07
-#define EVENT_NITRO_EXPIRED 0x08
+#include <arpa/inet.h>
 
-// Mensaje de evento de nitro
+#include "common_socket.h"
+
+//////////////////////// PROTOCOLO ////////////////////////
+
+constexpr uint8_t CMD_ACTIVATE_NITRO = 0x04;
+constexpr uint8_t CMD_NITRO_EVENT = 0x10;
+
+constexpr uint8_t EVENT_NITRO_ACTIVATED = 0x07;
+constexpr uint8_t EVENT_NITRO_EXPIRED = 0x08;
+
+//////////////////////// DTOs ////////////////////////
+
 struct NitroEvent {
-    uint16_t cars_with_nitro;  // Cantidad de autos con nitro activo
-    uint8_t event_type;         // 0x07 = activado, 0x08 = expirado
-    
+    uint16_t cars_with_nitro;
+    uint8_t event_type;
+
     NitroEvent(): cars_with_nitro(0), event_type(0) {}
-    NitroEvent(uint16_t cars, uint8_t type): 
-        cars_with_nitro(cars), event_type(type) {}
+    NitroEvent(uint16_t cars, uint8_t type): cars_with_nitro(cars), event_type(type) {}
 };
+
+//////////////////////// PROTOCOLO ////////////////////////
 
 class ProtocolThreads {
 private:
@@ -30,27 +36,24 @@ public:
     explicit ProtocolThreads(Socket& skt): socket(skt) {}
 
     //////////////////////// ENVÍO ////////////////////////
-    
-    // Cliente envía comando de activar nitro
+
     void send_activate_nitro() {
         uint8_t cmd = CMD_ACTIVATE_NITRO;
         socket.sendall(&cmd, sizeof(cmd));
     }
 
-    // Servidor envía evento de nitro
     void send_nitro_event(const NitroEvent& event) {
         uint8_t cmd = CMD_NITRO_EVENT;
         socket.sendall(&cmd, sizeof(cmd));
-        
+
         uint16_t cars_network = htons(event.cars_with_nitro);
         socket.sendall(&cars_network, sizeof(cars_network));
-        
+
         socket.sendall(&event.event_type, sizeof(event.event_type));
     }
 
     //////////////////////// RECEPCIÓN ////////////////////////
-    
-    // Recibir comando (devuelve código de comando)
+
     uint8_t receive_command() {
         uint8_t cmd;
         int ret = socket.recvall(&cmd, sizeof(cmd));
@@ -60,15 +63,14 @@ public:
         return cmd;
     }
 
-    // Recibir evento de nitro
     NitroEvent receive_nitro_event() {
         uint16_t cars_network;
         socket.recvall(&cars_network, sizeof(cars_network));
         uint16_t cars = ntohs(cars_network);
-        
+
         uint8_t event_type;
         socket.recvall(&event_type, sizeof(event_type));
-        
+
         return NitroEvent(cars, event_type);
     }
 
