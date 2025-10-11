@@ -1,0 +1,28 @@
+Puede que tengas una RC, este lock esta protegiendo todo el estado del monitor?
+threads-2025c2-PinangoJulio/server_src/server.cpp
+Line 34 in 6452f88
+ std::unique_lock<std::mutex> lock(clients_mutex); 
+threads-2025c2-PinangoJulio/server_src/server.cpp
+
+Line 91 in 6452f88
+ std::unique_lock<std::mutex> lock(clients_mutex); 
+
+
+Puede que no estes matando a los threads cuando se cierra el server?
+Puede que no estes limpiando los threads muertos?
+Modela clases separadas para el aceptador, gameloop, monitor, lÃ³gica del juego, etc.
+threads-2025c2-PinangoJulio/server_src/server.cpp
+
+Lines 17 to 20 in 6452f88
+     gameloop_thread = Thread([this]() { this->gameloop(); }); 
+     acceptor_thread = Thread([this]() { this->acceptor_loop(); }); 
+ } 
+
+
+Falta modelar un monitor
+threads-2025c2-PinangoJulio/server_src/server.cpp
+Lines 90 to 95 in 6452f88
+ std::unique_lock<std::mutex> lock(clients_mutex); 
+ auto client_it = std::find_if(clients.begin(), clients.end(), [&](const auto& client) { 
+     return client->get_id() == cmd->client_id; 
+ }); 

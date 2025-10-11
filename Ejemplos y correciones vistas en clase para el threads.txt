@@ -1,0 +1,117 @@
+EJEMPLO 1 DE MAL CODIGO:
+void Server::start() {
+    game_loop = std::make_unique<GameLoop>(*this);
+    game_loop->start();
+
+    acceptor_thread = std::make_unique<AcceptorThread>(*this, socket);
+    acceptor_thread->start();
+}
+
+No vimos Smart pointers, No hay razÃ³n para usar en el heap, se debe instanciar en el stack. En el client handler NO se pueden instanciar en el stack. La clase threads
+no es movible
+
+
+Ejemplo 2 de mal codigo:
+
+class MonitorClients {
+private:
+    std::unordered_map<int, ClientHandler*> clients;
+    std::mutex mtxMonitor;
+    int nitrosActive;
+
+public:
+    MonitorClients();
+    ~MonitorClients();
+
+    void addNewClient(ClientHandler* c);
+    void eliminateDeadClients();
+    void eliminateAllClients();
+    // IterationStats simulateIteration(const std::vector<Command>& commands); // This line is commented out in the image
+    // applyToClients se utiliza para aplicar un mismo metodo a todos los clientes
+    void applyToClients(const std::function<void(ClientHandler*)>& func);
+};
+
+El gameloop debe tener la lÃ³gica del juego, el monitor no debe tener lÃ³gica de juego. Separar la lÃ³gica del juego de las conexiones TCP. El monitor debe tener mÃ©todos pÃºblicos
+que muestren las critical sections (Agregar cliente, eliminar cliente, broadcast
+
+EJEMPLO 3 DE MAL CODIGO:
+void Server::process_commands() {
+    while (running()) {
+        std::optional<GameCommand> cmd = game_commands.try_pop();
+
+        if (!cmd.has_value()) {
+            break;
+        }
+
+        std::unique_lock<std::mutex> lock(clients_mutex);
+
+        auto client_it = std::find_if(clients.begin(), clients.end(), [&](const auto& client) {
+            return client->get_id() == cmd->client_id;
+        });
+
+        if (client_it != clients.end()) {
+            bool activated = (*client_it)->get_car().activate_nitro();
+        }
+    }
+}
+Clases que son monitores que expongan sus critical sections
+
+EJEMPLO 4 DE MAL CODIGO:
+void broadcast(const OutgoingMessage& msg) {
+    std::lock_guard<std::mutex> lock(mtx);
+    for (auto* q : outboxes) {
+        try {
+            q->push(msg);
+        } catch (...) {
+            // cliente desconectado, ignorar
+        }
+    }
+}
+No debe hacer una llamada bloqueante, el cacth deberÃ­a ser especidico
+
+EJEMPLO 5 DE MAL CODIGO:
+void SenderThread::run() {
+    while (should_keep_running()) {
+        const Message message = outgoing_queue.pop();
+
+        // Preparar buffer
+        std::vector<uint8_t> buffer(sizeof(Message::cars_with_nitro) + sizeof(Message::type) + sizeof(Message::event));
+        unsigned int offset = 0;
+
+        buffer[offset++] = message.type; // 0x10
+
+        // cars_with_nitro en big endian
+        uint16_t cars_be = htons(message.cars_with_nitro);
+        std::memcpy(buffer.data() + offset, &cars_be, sizeof(uint16_t));
+        offset += sizeof(uint16_t);
+
+        buffer[offset] = message.event; // 0x07 o 0x08
+
+        // Enviar mensaje
+        const int bytes_sent = client_socket.sendall(buffer.data(), buffer.size());
+    }
+}
+
+EJEMPLO 6 DE MAL CODIGO:
+void Server::shutdown_server(Socket& server, 
+                             const std::vector<std::unique_ptr<ClientConnection>>& clients) {
+    try {
+        server.shutdown(2);
+    } catch (const LibError&) {
+        server.close();
+    }
+
+    for (const auto& client : clients) {
+        client->response_queue.push({}); 
+        try {
+            client->client_socket.shutdown(2);
+        } catch (const LibError&) {
+            client->client_socket.close();
+        }
+    }
+}
+RC (Race condition) en agregar o eliminar un cliente. El read lo tiene que hacer el aceptador. El shutdown no esta bueno. Enel aceptador debe estar el open y el close
+
+Threads muertos: No estamos haciendo el Rip. sacar los clientes que estÃ¡n desconectados
+Monitor debe ser el owner xde la queue
+
