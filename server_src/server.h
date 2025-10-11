@@ -3,7 +3,6 @@
 
 #include <memory>
 #include <string>
-#include <utility>
 
 #include "../common_src/common_socket.h"
 #include "../common_src/queue.h"
@@ -54,24 +53,31 @@ public:
         acceptor->stop();
         try {
             acceptor_socket.shutdown(2);
-            acceptor_socket.close();
         } catch (...) {
             // Ignorar errores al cerrar
         }
 
-        // 2. Detener gameloop
-        gameloop->stop();
+        // 2. Detener todos los clientes (antes de cerrar la queue)
+        monitor.stop_all();
 
         // 3. Cerrar queue de comandos
-        game_commands.close();
+        try {
+            game_commands.close();
+        } catch (...) {
+            // Ya cerrada
+        }
 
-        // 4. Detener todos los clientes
-        monitor.stop_all();
+        // 4. Detener gameloop
+        gameloop->stop();
     }
 
     void wait_for_finish() {
-        acceptor->join();
-        gameloop->join();
+        if (acceptor && acceptor->is_alive()) {
+            acceptor->join();
+        }
+        if (gameloop && gameloop->is_alive()) {
+            gameloop->join();
+        }
     }
 
     ~Server() {

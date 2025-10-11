@@ -32,7 +32,7 @@ private:
     void process_commands() {
         // Leer TODOS los comandos pendientes (non-blocking)
         GameCommand cmd;
-        while (game_commands.try_pop(cmd)) {
+        while (game_commands.try_pop(cmd)) {  // try_pop usa referencia!
             activate_nitro_for_client(cmd.client_id);
         }
     }
@@ -96,6 +96,13 @@ public:
             for (int i = 0; i < 25 && should_keep_running(); i++) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
+        }
+
+        // Al salir del loop, procesar comandos pendientes una última vez
+        try {
+            process_commands();
+        } catch (const ClosedQueue&) {
+            // Queue ya cerrada
         }
     }
 };

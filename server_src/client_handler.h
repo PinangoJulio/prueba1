@@ -36,11 +36,16 @@ public:
                 if (cmd == CMD_ACTIVATE_NITRO) {
                     GameCommand game_cmd;
                     game_cmd.client_id = client_id;
-                    game_commands.push(game_cmd);
+
+                    try {
+                        game_commands.push(game_cmd);
+                    } catch (const ClosedQueue&) {
+                        break;  // Queue cerrada, salir
+                    }
                 }
             }
         } catch (const std::exception&) {
-            // Cliente desconectado
+            // Cliente desconectado o socket cerrado
         }
     }
 };
@@ -111,11 +116,22 @@ public:
         receiver->stop();
         sender->stop();
         sender->close_queue();
+
+        // Cerrar socket para desbloquear receive_command()
+        try {
+            socket.shutdown(2);
+        } catch (...) {
+            // Ignorar errores
+        }
     }
 
     void join() {
-        receiver->join();
-        sender->join();
+        if (receiver->is_alive()) {
+            receiver->join();
+        }
+        if (sender->is_alive()) {
+            sender->join();
+        }
     }
 
     bool is_alive() const { return receiver->is_alive() || sender->is_alive(); }
