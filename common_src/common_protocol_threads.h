@@ -10,19 +10,17 @@
 
 //////////////////////// PROTOCOLO ////////////////////////
 
-// Comandos del protocolo
 constexpr uint8_t CMD_ACTIVATE_NITRO = 0x04;
 constexpr uint8_t CMD_NITRO_EVENT = 0x10;
 
-// Tipos de evento
 constexpr uint8_t EVENT_NITRO_ACTIVATED = 0x07;
 constexpr uint8_t EVENT_NITRO_EXPIRED = 0x08;
 
 //////////////////////// DTOs ////////////////////////
 
 struct NitroEvent {
-    uint16_t cars_with_nitro;  // Cantidad de autos con nitro activo
-    uint8_t event_type;        // 0x07 = activado, 0x08 = expirado
+    uint16_t cars_with_nitro;
+    uint8_t event_type;
 
     NitroEvent(): cars_with_nitro(0), event_type(0) {}
     NitroEvent(uint16_t cars, uint8_t type): cars_with_nitro(cars), event_type(type) {}
