@@ -1,58 +1,83 @@
 #ifndef SERVER_H
 #define SERVER_H
 
-#include <atomic>
 #include <memory>
-#include <mutex>
 #include <string>
-#include <vector>
+#include <utility>
 
-#include "../common_src/common_queue.h"
 #include "../common_src/common_socket.h"
-#include "../common_src/common_thread.h"
+#include "../common_src/queue.h"
 
-#include "client_handler.h"
+#include "acceptor_thread.h"
+#include "gameloop_thread.h"
+#include "monitor_clients.h"
 
+/*
+ * Servidor
+ *
+ * RESPONSABILIDAD:
+ * - Orquestar los componentes (Monitor, Acceptor, GameLoop)
+ * - Iniciar y detener el servidor de forma ordenada
+ * - NO tiene lógica del juego ni manejo de clientes
+ */
 class Server {
 private:
     Socket acceptor_socket;
-    std::atomic<bool> running;
-    int next_client_id;
 
-    NonBlockingQueue<GameCommand> game_commands;
+    // Componentes (en stack, inicializados en orden correcto)
+    Queue<GameCommand> game_commands;
+    MonitorClients monitor;
 
-    std::vector<std::unique_ptr<ClientHandler>> clients;
-    std::mutex clients_mutex;
-
-    Thread acceptor_thread;
-    Thread gameloop_thread;
-
-    //////////////////////// ACCEPTOR THREAD ////////////////////////
-
-    void acceptor_loop();
-
-    void add_client(Socket client_socket);
-
-    //////////////////////// GAMELOOP THREAD ////////////////////////
-
-    void gameloop();
-
-    void process_commands();
-
-    void simulate_world();
-
-    void broadcast_event(const NitroEvent& event);
-
-    uint16_t count_cars_with_nitro();
+    // Threads (en heap porque no son movibles)
+    std::unique_ptr<GameLoopThread> gameloop;
+    std::unique_ptr<AcceptorThread> acceptor;
 
 public:
-    explicit Server(const std::string& port);
+    explicit Server(const std::string& port):
+            acceptor_socket(port.c_str()), game_commands() {  // Unbounded queue por defecto
 
-    void start();
+        // Crear threads en heap
+        gameloop = std::make_unique<GameLoopThread>(monitor, game_commands);
+        acceptor = std::make_unique<AcceptorThread>(acceptor_socket, monitor, game_commands);
+    }
 
-    void stop();
+    void start() {
+        // Iniciar gameloop PRIMERO (así está listo para procesar)
+        gameloop->start();
 
-    void wait_for_finish();
+        // Luego aceptador
+        acceptor->start();
+    }
+
+    void stop() {
+        // 1. Detener acceptor (no más clientes nuevos)
+        acceptor->stop();
+        try {
+            acceptor_socket.shutdown(2);
+            acceptor_socket.close();
+        } catch (...) {
+            // Ignorar errores al cerrar
+        }
+
+        // 2. Detener gameloop
+        gameloop->stop();
+
+        // 3. Cerrar queue de comandos
+        game_commands.close();
+
+        // 4. Detener todos los clientes
+        monitor.stop_all();
+    }
+
+    void wait_for_finish() {
+        acceptor->join();
+        gameloop->join();
+    }
+
+    ~Server() {
+        stop();
+        wait_for_finish();
+    }
 
     Server(const Server&) = delete;
     Server& operator=(const Server&) = delete;
