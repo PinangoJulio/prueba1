@@ -4,6 +4,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <utility>
 #include <vector>
 
 #include "client_handler.h"
@@ -25,7 +26,7 @@ public:
     // Aplica una función a todos los clientes (para broadcast)
     void apply_to_all(const std::function<void(ClientHandler&)>& func) {
         std::unique_lock<std::mutex> lock(mutex);
-        for (auto& client : clients) {
+        for (auto& client: clients) {
             func(*client);
         }
     }
@@ -33,11 +34,14 @@ public:
     // Busca un cliente por ID y aplica una función si lo encuentra
     bool apply_to_client(int client_id, const std::function<void(ClientHandler&)>& func) {
         std::unique_lock<std::mutex> lock(mutex);
-        for (auto& client : clients) {
-            if (client->get_id() == client_id) {
-                func(*client);
-                return true;
-            }
+        auto it = std::find_if(clients.begin(), clients.end(),
+                               [client_id](const std::unique_ptr<ClientHandler>& client) {
+                                   return client->get_id() == client_id;
+                               });
+
+        if (it != clients.end()) {
+            func(*(*it));
+            return true;
         }
         return false;
     }
@@ -45,7 +49,7 @@ public:
     // Detiene todos los clientes
     void stop_all() {
         std::unique_lock<std::mutex> lock(mutex);
-        for (auto& client : clients) {
+        for (auto& client: clients) {
             client->stop();
         }
     }

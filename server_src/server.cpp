@@ -1,31 +1,30 @@
 #include "server.h"
 
+#include <algorithm>
 #include <chrono>
 #include <iostream>
+#include <memory>
 #include <string>
 #include <thread>
 #include <utility>
+#include <vector>
 
 #define GAMELOOP_SLEEP_MS 250  // 4 loops/segundo = 250ms
 
 Server::Server(const std::string& port):
-        acceptor_socket(port.c_str()), running(false), next_client_id(0) {}
+        acceptor(port.c_str()), running(false), next_client_id(0) {}
 
 void Server::start() {
     running = true;
 
     gameloop_thread = Thread([this]() { this->gameloop(); });
-    acceptor_thread = Thread([this]() { this->acceptor_loop(); });
+    acceptor.start([this](Socket skt) { this->on_new_client(std::move(skt)); });
 }
 
 void Server::stop() {
     running = false;
 
-    try {
-        acceptor_socket.shutdown(2);
-    } catch (...) {
-        // Ignoramos errores al cerrar
-    }
+    acceptor.stop();
 
     // Esperamos a que el gameloop termine su iteración actual
     gameloop_thread.join();
@@ -36,23 +35,12 @@ void Server::stop() {
 }
 
 void Server::wait_for_finish() {
-    acceptor_thread.join();
+    // El acceptor ya se joinea en stop()
 }
 
-//////////////////////// ACCEPTOR THREAD ////////////////////////
+//////////////////////// CLIENT MANAGEMENT ////////////////////////
 
-void Server::acceptor_loop() {
-    while (running) {
-        try {
-            Socket client_socket = acceptor_socket.accept();
-            add_client(std::move(client_socket));
-        } catch (const std::exception& e) {
-            break;
-        }
-    }
-}
-
-void Server::add_client(Socket client_socket) {
+void Server::on_new_client(Socket client_socket) {
     int client_id = next_client_id++;
 
     auto handler =
@@ -99,7 +87,7 @@ void Server::simulate_world() {
     // Identificamos qué autos van a expirar ANTES de actualizar nada
     std::vector<int> about_to_expire;
     std::vector<int> all_clients;
-    
+
     clients_monitor.apply_to_all([&](ClientHandler& client) {
         all_clients.push_back(client.get_id());
         if (client.get_car().will_expire()) {
@@ -108,28 +96,21 @@ void Server::simulate_world() {
     });
 
     // Actualizamos todos los autos que NO van a expirar
-    for (int client_id : all_clients) {
-        // Verificamos si está en la lista de los que van a expirar
-        bool will_expire = false;
-        for (int id : about_to_expire) {
-            if (id == client_id) {
-                will_expire = true;
-                break;
-            }
-        }
-        
+    for (int client_id: all_clients) {
+        // Verificamos si está en la lista de los que van a expirar usando std::any_of
+        bool will_expire = std::any_of(about_to_expire.begin(), about_to_expire.end(),
+                                       [client_id](int id) { return id == client_id; });
+
         if (!will_expire) {
-            clients_monitor.apply_to_client(client_id, [&](ClientHandler& client) {
-                client.get_car().update();
-            });
+            clients_monitor.apply_to_client(
+                    client_id, [&](ClientHandler& client) { client.get_car().update(); });
         }
     }
 
     // Para cada auto que va a expirar, lo actualizamos Y enviamos el evento
-    for (int client_id : about_to_expire) {
-        clients_monitor.apply_to_client(client_id, [&](ClientHandler& client) {
-            client.get_car().update();
-        });
+    for (int client_id: about_to_expire) {
+        clients_monitor.apply_to_client(client_id,
+                                        [&](ClientHandler& client) { client.get_car().update(); });
 
         uint16_t cars_with_nitro = count_cars_with_nitro();
         NitroEvent event(cars_with_nitro, EVENT_NITRO_EXPIRED);
@@ -140,9 +121,7 @@ void Server::simulate_world() {
 }
 
 void Server::broadcast_event(const NitroEvent& event) {
-    clients_monitor.apply_to_all([&](ClientHandler& client) {
-        client.send_event(event);
-    });
+    clients_monitor.apply_to_all([&](ClientHandler& client) { client.send_event(event); });
 }
 
 uint16_t Server::count_cars_with_nitro() {
