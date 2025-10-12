@@ -24,7 +24,6 @@ public:
         return true;
     }
 
-
     bool update() {
         if (!nitro_active) {
             return false;
@@ -39,6 +38,14 @@ public:
         }
 
         return false;
+    }
+
+    // Verifica si el nitro va a expirar en el próximo update (sin actualizar)
+    bool will_expire() const {
+        if (!nitro_active) {
+            return false;
+        }
+        return iterations_remaining == 1;
     }
 
     bool has_nitro() const { return nitro_active; }

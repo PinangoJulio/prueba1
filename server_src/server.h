@@ -2,16 +2,14 @@
 #define SERVER_H
 
 #include <atomic>
-#include <memory>
-#include <mutex>
 #include <string>
-#include <vector>
 
 #include "../common_src/common_queue.h"
 #include "../common_src/common_socket.h"
 #include "../common_src/common_thread.h"
 
 #include "client_handler.h"
+#include "clients_monitor.h"
 
 class Server {
 private:
@@ -20,9 +18,7 @@ private:
     int next_client_id;
 
     NonBlockingQueue<GameCommand> game_commands;
-
-    std::vector<std::unique_ptr<ClientHandler>> clients;
-    std::mutex clients_mutex;
+    ClientsMonitor clients_monitor;
 
     Thread acceptor_thread;
     Thread gameloop_thread;
