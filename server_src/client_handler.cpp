@@ -43,8 +43,8 @@ void ClientHandler::receiver_loop() {
     } catch (const std::exception& e) {
         // Cliente desconectado o error de red
         running = false;
-        is_dead = true;
-        send_queue.close();  // Despertamos al sender
+        is_dead.store(true);  // Escritura atómica
+        send_queue.close();   // Despertamos al sender
     }
 }
 
@@ -64,14 +64,22 @@ void ClientHandler::sender_loop() {
     } catch (const std::exception& e) {
         // Error al enviar, cliente probablemente desconectado
         running = false;
-        is_dead = true;
+        is_dead.store(true);  // Escritura atómica
     }
 }
 
 //////////////////////// ENVIAR EVENTO ////////////////////////
 
 void ClientHandler::send_event(const NitroEvent& event) {
-    if (!is_dead) {
-        send_queue.push(NitroEvent(event));
+    // Lectura atómica de is_dead
+    if (!is_dead.load(std::memory_order_acquire)) {
+        // BlockingQueue::push maneja queues cerradas, pero agregamos
+        // try-catch por seguridad ante posible race condition
+        try {
+            send_queue.push(NitroEvent(event));
+        } catch (const std::exception& e) {
+            // Si la queue se cerró justo ahora, ignoramos silenciosamente
+            // Esto es esperado cuando un cliente se desconecta
+        }
     }
 }

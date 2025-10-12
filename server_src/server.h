@@ -20,7 +20,7 @@ private:
     GameLoop gameloop;
 
     std::atomic<bool> running;
-    int next_client_id;
+    std::atomic<int> next_client_id;
 
     void on_new_client(Socket client_socket);
 
