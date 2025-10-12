@@ -1,6 +1,7 @@
 #ifndef CLIENTS_MONITOR_H
 #define CLIENTS_MONITOR_H
 
+#include <algorithm>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -23,15 +24,17 @@ public:
         clients.push_back(std::move(client));
     }
 
-    // Aplica una función a todos los clientes (para broadcast)
+    // Aplica una función a todos los clientes VIVOS (para broadcast)
     void apply_to_all(const std::function<void(ClientHandler&)>& func) {
         std::unique_lock<std::mutex> lock(mutex);
         for (auto& client: clients) {
-            func(*client);
+            if (!client->dead()) {
+                func(*client);
+            }
         }
     }
 
-    // Busca un cliente por ID y aplica una función si lo encuentra
+    // Busca un cliente por ID y aplica una función si lo encuentra y está vivo
     bool apply_to_client(int client_id, const std::function<void(ClientHandler&)>& func) {
         std::unique_lock<std::mutex> lock(mutex);
         auto it = std::find_if(clients.begin(), clients.end(),
@@ -39,11 +42,30 @@ public:
                                    return client->get_id() == client_id;
                                });
 
-        if (it != clients.end()) {
+        if (it != clients.end() && !(*it)->dead()) {
             func(*(*it));
             return true;
         }
         return false;
+    }
+
+    // Limpia los clientes muertos (hace join y los remueve)
+    void remove_dead_clients() {
+        std::unique_lock<std::mutex> lock(mutex);
+
+        // Hacemos join de los threads muertos antes de eliminarlos
+        for (auto& client: clients) {
+            if (client->dead()) {
+                client->join();
+            }
+        }
+
+        // Removemos los clientes muertos del vector
+        clients.erase(std::remove_if(clients.begin(), clients.end(),
+                                     [](const std::unique_ptr<ClientHandler>& client) {
+                                         return client->dead();
+                                     }),
+                      clients.end());
     }
 
     // Detiene todos los clientes
@@ -54,9 +76,12 @@ public:
         }
     }
 
-    // Limpia todos los clientes
+    // Limpia todos los clientes (hace join de todos)
     void clear() {
         std::unique_lock<std::mutex> lock(mutex);
+        for (auto& client: clients) {
+            client->join();
+        }
         clients.clear();
     }
 

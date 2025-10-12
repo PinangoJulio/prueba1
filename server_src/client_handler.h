@@ -1,6 +1,7 @@
 #ifndef CLIENT_HANDLER_H
 #define CLIENT_HANDLER_H
 
+#include <atomic>
 #include <memory>
 
 #include "../common_src/common_protocol_threads.h"
@@ -30,7 +31,8 @@ private:
     Thread receiver_thread;
     Thread sender_thread;
 
-    bool running;
+    std::atomic<bool> running;
+    std::atomic<bool> is_dead;  // Marca si el cliente está muerto
 
     //////////////////////// THREADS ////////////////////////
 
@@ -44,6 +46,12 @@ public:
     void start();
 
     void stop();
+
+    // Hace join de los threads (el "RIP")
+    void join();
+
+    // Verifica si el cliente está muerto (desconectado)
+    bool dead() const { return is_dead; }
 
     void send_event(const NitroEvent& event);
 

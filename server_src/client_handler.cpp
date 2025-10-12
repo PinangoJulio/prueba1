@@ -8,7 +8,8 @@ ClientHandler::ClientHandler(int id, Socket skt, NonBlockingQueue<GameCommand>& 
         socket(std::move(skt)),
         protocol(socket),
         game_commands(game_queue),
-        running(false) {}
+        running(false),
+        is_dead(false) {}
 
 void ClientHandler::start() {
     running = true;
@@ -19,6 +20,11 @@ void ClientHandler::start() {
 void ClientHandler::stop() {
     running = false;
     send_queue.close();
+}
+
+void ClientHandler::join() {
+    receiver_thread.join();
+    sender_thread.join();
 }
 
 //////////////////////// THREAD RECEIVER ////////////////////////
@@ -35,7 +41,10 @@ void ClientHandler::receiver_loop() {
             }
         }
     } catch (const std::exception& e) {
+        // Cliente desconectado o error de red
         running = false;
+        is_dead = true;
+        send_queue.close();  // Despertamos al sender
     }
 }
 
@@ -47,16 +56,22 @@ void ClientHandler::sender_loop() {
             std::optional<NitroEvent> event = send_queue.pop();
 
             if (!event.has_value()) {
-                break;
+                break;  // Queue cerrada
             }
 
             protocol.send_nitro_event(event.value());
         }
     } catch (const std::exception& e) {
+        // Error al enviar, cliente probablemente desconectado
         running = false;
+        is_dead = true;
     }
 }
 
 //////////////////////// ENVIAR EVENTO ////////////////////////
 
-void ClientHandler::send_event(const NitroEvent& event) { send_queue.push(NitroEvent(event)); }
+void ClientHandler::send_event(const NitroEvent& event) {
+    if (!is_dead) {
+        send_queue.push(NitroEvent(event));
+    }
+}

@@ -26,6 +26,10 @@ void GameLoop::loop() {
     while (running) {
         game_logic.process_commands();
         game_logic.simulate_world();
+
+        // Limpiamos clientes muertos (hace el "RIP")
+        clients_monitor.remove_dead_clients();
+
         std::this_thread::sleep_for(std::chrono::milliseconds(GAMELOOP_SLEEP_MS));
     }
 }
