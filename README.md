@@ -4,62 +4,36 @@
 Este proyecto implementa una prueba de concepto (PoC) del sistema de nitro para el juego Need for Speed. El servidor gestiona una partida multijugador donde los clientes pueden activar el nitro de sus autos, aumentando su velocidad temporalmente. El sistema utiliza múltiples threads para manejar la comunicación, el game loop y la lógica del juego de forma concurrente.
 
 ## Estructura del Proyecto
-
+``` 
 ├── client_src/
-
 │   ├── client.h
-
 │   ├── client.cpp
-
 │   └── client_main.cpp
-
 ├── server_src/
-
 │   ├── server.h
-
 │   ├── server.cpp
-
 │   ├── server_main.cpp
-
 │   ├── acceptor.h
-
 │   ├── acceptor.cpp
-
 │   ├── client_handler.h
-
 │   ├── client_handler.cpp
-
 │   ├── clients_monitor.h
-
 │   ├── gameloop.h
-
 │   ├── gameloop.cpp
-
 │   ├── game_logic.h
-
 │   ├── game_logic.cpp
-
 │   └── car.h
-
 ├── common_src/
-
 │   ├── common_protocol_threads.h
-
 │   ├── common_queue.h
-
 │   ├── common_thread.h
-
 │   ├── common_socket.*
-
 │   ├── resolver.*
-
 │   ├── liberror.*
-
 │   └── resolvererror.*
-
 ├── MakefileThreads
-
 └── README.md
+```
 
 ## Arquitectura
 
