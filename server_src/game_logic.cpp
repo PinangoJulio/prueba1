@@ -3,14 +3,21 @@
 #include <algorithm>
 #include <iostream>
 
+//////////////////////// CONSTRUCTOR ////////////////////////
+
 GameLogic::GameLogic(ClientsMonitor& monitor, NonBlockingQueue<GameCommand>& commands):
         clients_monitor(monitor), game_commands(commands) {}
+
+//////////////////////// CONFIGURACIÓN ////////////////////////
 
 void GameLogic::set_event_callback(std::function<void(const GameEvent&)> callback) {
     on_event = callback;
 }
 
+//////////////////////// LÓGICA DEL JUEGO ////////////////////////
+
 void GameLogic::process_commands() {
+    // Procesamos todos los comandos pendientes (no bloqueante)
     while (true) {
         std::optional<GameCommand> cmd = game_commands.try_pop();
 
@@ -18,11 +25,13 @@ void GameLogic::process_commands() {
             break;
         }
 
+        // Intentamos activar el nitro del cliente
         bool activated = false;
         clients_monitor.apply_to_client(cmd->client_id, [&](ClientHandler& client) {
             activated = client.get_car().activate_nitro();
         });
 
+        // Si se activó, generamos el evento
         if (activated) {
             uint16_t cars_with_nitro = count_cars_with_nitro();
             NitroEvent event(cars_with_nitro, EVENT_NITRO_ACTIVATED);
@@ -32,6 +41,7 @@ void GameLogic::process_commands() {
                 on_event(game_event);
             }
         }
+        // Si no se activó, se ignora silenciosamente (nitro ya estaba activo)
     }
 }
 
@@ -72,6 +82,8 @@ void GameLogic::simulate_world() {
         }
     }
 }
+
+//////////////////////// HELPERS ////////////////////////
 
 uint16_t GameLogic::count_cars_with_nitro() {
     uint16_t count = 0;

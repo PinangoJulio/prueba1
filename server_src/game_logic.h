@@ -11,6 +11,8 @@
 #include "client_handler.h"
 #include "clients_monitor.h"
 
+//////////////////////// GAME EVENT ////////////////////////
+
 // Estructura para eventos que deben ser broadcasted
 struct GameEvent {
     NitroEvent event;
@@ -21,6 +23,8 @@ struct GameEvent {
             event(e), should_print(print), message(msg) {}
 };
 
+//////////////////////// GAME LOGIC ////////////////////////
+
 class GameLogic {
 private:
     ClientsMonitor& clients_monitor;
@@ -29,19 +33,30 @@ private:
     // Callback para enviar eventos (desacopla de cómo se envían)
     std::function<void(const GameEvent&)> on_event;
 
+    //////////////////////// HELPERS ////////////////////////
+
+    // Cuenta cuántos autos tienen nitro activo
     uint16_t count_cars_with_nitro();
 
 public:
+    //////////////////////// CONSTRUCTOR ////////////////////////
+
     GameLogic(ClientsMonitor& monitor, NonBlockingQueue<GameCommand>& commands);
+
+    //////////////////////// CONFIGURACIÓN ////////////////////////
 
     // Configura el callback para eventos
     void set_event_callback(std::function<void(const GameEvent&)> callback);
+
+    //////////////////////// LÓGICA DEL JUEGO ////////////////////////
 
     // Procesa todos los comandos pendientes
     void process_commands();
 
     // Simula una iteración del mundo
     void simulate_world();
+
+    //////////////////////// MOVIMIENTO Y COPIA ////////////////////////
 
     GameLogic(const GameLogic&) = delete;
     GameLogic& operator=(const GameLogic&) = delete;

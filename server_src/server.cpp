@@ -4,21 +4,28 @@
 #include <memory>
 #include <utility>
 
+//////////////////////// CONSTRUCTOR ////////////////////////
+
 Server::Server(const std::string& port):
         acceptor(port.c_str()),
         gameloop(clients_monitor, game_commands),
         running(false),
         next_client_id(0) {}
 
-void Server::start() {
-    running = true;
+//////////////////////// CONTROL DE CICLO DE VIDA ////////////////////////
 
+void Server::start() {
+    running.store(true, std::memory_order_release);
+
+    // Iniciamos el gameloop primero
     gameloop.start();
+
+    // Luego el acceptor (que comenzará a agregar clientes)
     acceptor.start([this](Socket skt) { this->on_new_client(std::move(skt)); });
 }
 
 void Server::stop() {
-    running = false;
+    running.store(false, std::memory_order_release);
 
     // Orden correcto de shutdown:
     // 1. Dejar de aceptar nuevos clientes
@@ -38,22 +45,29 @@ void Server::stop() {
 }
 
 void Server::wait_for_finish() {
-    // El acceptor y gameloop ya se joinean en stop()
-    // Los clientes ya se joinearon en clients_monitor.clear()
+    // Todos los threads ya se joinearon en stop()
+    // Este método existe por si en el futuro se necesita alguna limpieza adicional
 }
+
+//////////////////////// CALLBACKS ////////////////////////
 
 void Server::on_new_client(Socket client_socket) {
     // Verificamos si aún estamos aceptando clientes
-    if (!running) {
+    if (!running.load(std::memory_order_acquire)) {
         // El socket se cerrará automáticamente al salir de scope
         return;
     }
 
-    int client_id = next_client_id++;
+    // Asignamos un ID único al cliente
+    int client_id = next_client_id.fetch_add(1, std::memory_order_relaxed);
 
+    // Creamos el handler del cliente
     auto handler =
             std::make_unique<ClientHandler>(client_id, std::move(client_socket), game_commands);
 
+    // Iniciamos sus threads
     handler->start();
+
+    // Lo agregamos al monitor
     clients_monitor.add_client(std::move(handler));
 }
