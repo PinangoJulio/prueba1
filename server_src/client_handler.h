@@ -57,7 +57,7 @@ public:
 
     bool is_dead() const { return dead_flag.load(std::memory_order_acquire); }
 
-    void send_event(const NitroEvent& event);
+    bool try_send_event(const NitroEvent& event);
 
     Car& get_car() { return car; }
 

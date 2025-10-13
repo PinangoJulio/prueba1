@@ -72,6 +72,19 @@ public:
         return false;
     }
 
+    //////////////////////// BROADCAST (CRITICAL SECTION) ////////////////////////
+
+    // Envía un evento a todos los clientes vivos sin bloquear (Critical Section)
+    void broadcast(const NitroEvent& event) {
+        std::unique_lock<std::mutex> lock(mutex);
+        for (auto& client: clients) {
+            if (!client->is_dead()) {
+                // try_send_event no bloquea, ignora si falla
+                client->try_send_event(event);
+            }
+        }
+    }
+
     //////////////////////// SHUTDOWN ////////////////////////
 
     // Detiene todos los clientes (es una Critical Section)

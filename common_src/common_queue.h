@@ -128,6 +128,16 @@ public:
         return true;
     }
 
+    bool try_push(T&& item) {
+        std::unique_lock<std::mutex> lock(mutex);
+        if (closed || queue.size() >= max_size) {
+            return false;
+        }
+        queue.push(std::move(item));
+        cv_consumers.notify_one();
+        return true;
+    }
+
     std::optional<T> pop() {
         std::unique_lock<std::mutex> lock(mutex);
         cv_consumers.wait(lock, [this]() { return !queue.empty() || closed; });

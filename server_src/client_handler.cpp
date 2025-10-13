@@ -72,4 +72,6 @@ void ClientHandler::sender_loop() {
 
 //////////////////////// COMUNICACIÓN ////////////////////////
 
-void ClientHandler::send_event(const NitroEvent& event) { send_queue.push(NitroEvent(event)); }
+bool ClientHandler::try_send_event(const NitroEvent& event) {
+    return send_queue.try_push(NitroEvent(event));
+}
