@@ -3,8 +3,6 @@
 #include <iostream>
 #include <utility>
 
-//////////////////////// CONSTRUCTOR ////////////////////////
-
 ClientHandler::ClientHandler(int id, Socket skt, NonBlockingQueue<GameCommand>& game_queue):
         client_id(id),
         socket(std::move(skt)),
@@ -14,7 +12,6 @@ ClientHandler::ClientHandler(int id, Socket skt, NonBlockingQueue<GameCommand>& 
         running(false),
         dead_flag(false) {}
 
-//////////////////////// CONTROL DE CICLO DE VIDA ////////////////////////
 
 void ClientHandler::start() {
     running.store(true, std::memory_order_release);
@@ -45,7 +42,7 @@ void ClientHandler::receiver_loop() {
             }
         }
     } catch (const std::exception& e) {
-        // Cliente desconectado o error de red
+        // o el Cliente está desconectado o es un error de la red
         running.store(false, std::memory_order_release);
         dead_flag.store(true, std::memory_order_release);
         send_queue.close();
@@ -60,14 +57,14 @@ void ClientHandler::sender_loop() {
             std::optional<NitroEvent> event = send_queue.pop();
 
             if (!event.has_value()) {
-                // Queue cerrada
+                // La Queue debe estar cerrada en este punto
                 break;
             }
 
             protocol.send_nitro_event(event.value());
         }
     } catch (const std::exception& e) {
-        // Error al enviar, cliente desconectado
+        // Error al enviar, o el Cliente está desconectado o es un error de la red
         running.store(false, std::memory_order_release);
         dead_flag.store(true, std::memory_order_release);
     }
@@ -75,8 +72,4 @@ void ClientHandler::sender_loop() {
 
 //////////////////////// COMUNICACIÓN ////////////////////////
 
-void ClientHandler::send_event(const NitroEvent& event) {
-    // BoundedBlockingQueue::push maneja internamente el caso
-    // de queue cerrada, retornando false
-    send_queue.push(NitroEvent(event));
-}
+void ClientHandler::send_event(const NitroEvent& event) { send_queue.push(NitroEvent(event)); }

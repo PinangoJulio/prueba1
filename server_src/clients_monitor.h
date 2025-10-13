@@ -10,7 +10,6 @@
 
 #include "client_handler.h"
 
-//////////////////////// CLIENTS MONITOR ////////////////////////
 
 class ClientsMonitor {
 private:
@@ -32,14 +31,12 @@ public:
     void remove_dead_clients() {
         std::unique_lock<std::mutex> lock(mutex);
 
-        // Primero hacemos join de los threads muertos
         for (auto& client: clients) {
             if (client->is_dead()) {
                 client->join();
             }
         }
 
-        // Removemos los clientes muertos del vector
         clients.erase(std::remove_if(clients.begin(), clients.end(),
                                      [](const std::unique_ptr<ClientHandler>& client) {
                                          return client->is_dead();
@@ -47,9 +44,9 @@ public:
                       clients.end());
     }
 
-    //////////////////////// OPERACIONES EN CLIENTES ////////////////////////
+    //////////////////////// OPERACIONES EN CLIENTES  ////////////////////////
 
-    // Aplica una función a todos los clientes VIVOS (Critical Section para broadcast)
+    // Aplica una función a todos los clientes que estan VIVOS (es una Critical Section)
     void apply_to_all(const std::function<void(ClientHandler&)>& func) {
         std::unique_lock<std::mutex> lock(mutex);
         for (auto& client: clients) {
@@ -59,8 +56,8 @@ public:
         }
     }
 
-    // Busca un cliente por ID y aplica una función si lo encuentra y está vivo
-    // (Critical Section)
+    // Busca un cliente por ID y aplica una función si lo encuentra y está vivo (es una Critical
+    // Section)
     bool apply_to_client(int client_id, const std::function<void(ClientHandler&)>& func) {
         std::unique_lock<std::mutex> lock(mutex);
         auto it = std::find_if(clients.begin(), clients.end(),
@@ -77,7 +74,7 @@ public:
 
     //////////////////////// SHUTDOWN ////////////////////////
 
-    // Detiene todos los clientes (Critical Section)
+    // Detiene todos los clientes (es una Critical Section)
     void stop_all() {
         std::unique_lock<std::mutex> lock(mutex);
         for (auto& client: clients) {
@@ -85,7 +82,7 @@ public:
         }
     }
 
-    // Limpia todos los clientes (hace join de todos) (Critical Section)
+    // Limpia todos los clientes (es una Critical Section)
     void clear() {
         std::unique_lock<std::mutex> lock(mutex);
         for (auto& client: clients) {
@@ -93,8 +90,6 @@ public:
         }
         clients.clear();
     }
-
-    //////////////////////// MOVIMIENTO Y COPIA ////////////////////////
 
     ClientsMonitor(const ClientsMonitor&) = delete;
     ClientsMonitor& operator=(const ClientsMonitor&) = delete;

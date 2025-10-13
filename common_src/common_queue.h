@@ -107,19 +107,16 @@ class BoundedBlockingQueue {
 private:
     std::queue<T> queue;
     std::mutex mutex;
-    std::condition_variable cv_producers;  // Despierta cuando hay espacio
-    std::condition_variable cv_consumers;  // Despierta cuando hay elementos
+    std::condition_variable cv_producers;
+    std::condition_variable cv_consumers;
     size_t max_size;
     bool closed;
 
 public:
     explicit BoundedBlockingQueue(size_t capacity): max_size(capacity), closed(false) {}
 
-    // Retorna false si la queue está cerrada
     bool push(T&& item) {
         std::unique_lock<std::mutex> lock(mutex);
-
-        // Esperamos a que haya espacio o la queue se cierre
         cv_producers.wait(lock, [this]() { return queue.size() < max_size || closed; });
 
         if (closed) {
@@ -133,8 +130,6 @@ public:
 
     std::optional<T> pop() {
         std::unique_lock<std::mutex> lock(mutex);
-
-        // Esperamos a que haya elementos o la queue se cierre
         cv_consumers.wait(lock, [this]() { return !queue.empty() || closed; });
 
         if (closed && queue.empty()) {

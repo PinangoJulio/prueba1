@@ -27,7 +27,6 @@ int main(int argc, const char* argv[]) {
         }
 
         server.stop();
-        server.wait_for_finish();
 
     } catch (const std::exception& e) {
         std::cerr << "Server error: " << e.what() << std::endl;

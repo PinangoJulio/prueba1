@@ -3,13 +3,11 @@
 
 #include <cstdint>
 
-//////////////////////// CONFIGURACIÓN ////////////////////////
 
 // 3 segundos = 12 iteraciones (4 loops/segundo)
-// Puedes modificar este valor según necesites
+// se puede MODIFICAR a conveniencia
 #define NITRO_DURATION_ITERATIONS 12
 
-//////////////////////// CAR ////////////////////////
 
 class Car {
 private:
@@ -17,27 +15,17 @@ private:
     int iterations_remaining;
 
 public:
-    //////////////////////// CONSTRUCTOR ////////////////////////
-
     Car(): nitro_active(false), iterations_remaining(0) {}
 
-    //////////////////////// ACTIVACIÓN DE NITRO ////////////////////////
-
-    // Intenta activar el nitro
-    // Retorna true si se activó, false si ya estaba activo
     bool activate_nitro() {
         if (nitro_active) {
-            return false;  // Se ignora porque el nitro ya está activo
+            return false;  // Se ignora, el nitro ya está activo, no deberia poder usarlo
         }
         nitro_active = true;
         iterations_remaining = NITRO_DURATION_ITERATIONS;
         return true;
     }
 
-    //////////////////////// ACTUALIZACIÓN ////////////////////////
-
-    // Actualiza el estado del nitro (decrementa el contador)
-    // Retorna true si el nitro expiró en esta iteración
     bool update() {
         if (!nitro_active) {
             return false;
@@ -48,15 +36,12 @@ public:
         if (iterations_remaining <= 0) {
             nitro_active = false;
             iterations_remaining = 0;
-            return true;  // El nitro expiró
+            return true;  // El nitro ya expiró, puede volver a usarlo
         }
 
-        return false;  // El nitro sigue activo
+        return false;  // El nitro sigue activo, no puede usarlo
     }
 
-    //////////////////////// CONSULTAS ////////////////////////
-
-    // Verifica si el nitro va a expirar en el próximo update (sin actualizar)
     bool will_expire() const {
         if (!nitro_active) {
             return false;
@@ -64,12 +49,8 @@ public:
         return iterations_remaining == 1;
     }
 
-    // Verifica si el nitro está activo
     bool has_nitro() const { return nitro_active; }
 
-    //////////////////////// RESET ////////////////////////
-
-    // Resetea el estado del auto
     void reset() {
         nitro_active = false;
         iterations_remaining = 0;
