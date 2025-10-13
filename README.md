@@ -6,32 +6,59 @@ Este proyecto implementa una prueba de concepto (PoC) del sistema de nitro para 
 ## Estructura del Proyecto
 
 ├── client_src/
+
 │   ├── client.h
+
 │   ├── client.cpp
+
 │   └── client_main.cpp
+
 ├── server_src/
+
 │   ├── server.h
+
 │   ├── server.cpp
+
 │   ├── server_main.cpp
+
 │   ├── acceptor.h
+
 │   ├── acceptor.cpp
+
 │   ├── client_handler.h
+
 │   ├── client_handler.cpp
+
 │   ├── clients_monitor.h
+
 │   ├── gameloop.h
+
 │   ├── gameloop.cpp
+
 │   ├── game_logic.h
+
 │   ├── game_logic.cpp
+
 │   └── car.h
+
 ├── common_src/
+
 │   ├── common_protocol_threads.h
+
 │   ├── common_queue.h
+
 │   ├── common_thread.h
+
 │   ├── common_socket.*
+
 │   ├── resolver.*
+
 │   ├── liberror.*
+
 │   └── resolvererror.*
+
 ├── MakefileThreads
+
 └── README.md
 
 ## Arquitectura
