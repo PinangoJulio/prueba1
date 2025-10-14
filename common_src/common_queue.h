@@ -26,6 +26,15 @@ public:
         }
     }
 
+    bool try_push(T&& item) {
+        std::unique_lock<std::mutex> lock(mutex);
+        if (closed) {
+            return false;
+        }
+        queue.push(std::move(item));
+        return true;
+    }
+
     std::optional<T> try_pop() {
         std::unique_lock<std::mutex> lock(mutex);
         if (queue.empty()) {

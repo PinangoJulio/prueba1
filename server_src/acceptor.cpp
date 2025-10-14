@@ -42,8 +42,6 @@ void Acceptor::acceptor_loop() {
         try {
             Socket client_socket = acceptor_socket.accept();
 
-            // Verificamos el running después de accept, esto es por pasa que nos despiertan con el
-            // cierre
             if (!running.load(std::memory_order_acquire)) {
                 break;
             }

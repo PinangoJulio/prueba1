@@ -21,13 +21,13 @@ public:
 
     //////////////////////// GESTIÓN DE CLIENTES ////////////////////////
 
-    // Agrega un nuevo cliente al monitor (Critical Section)
+    // Agrega un nuevo cliente al monitor (es una Critical Section)
     void add_client(std::unique_ptr<ClientHandler> client) {
         std::unique_lock<std::mutex> lock(mutex);
         clients.push_back(std::move(client));
     }
 
-    // Limpia los clientes muertos (hace join y los remueve) (Critical Section)
+    // Limpia los clientes muertos (hace join y los remueve) (es unaCritical Section)
     void remove_dead_clients() {
         std::unique_lock<std::mutex> lock(mutex);
 
@@ -79,7 +79,7 @@ public:
         std::unique_lock<std::mutex> lock(mutex);
         for (auto& client: clients) {
             if (!client->is_dead()) {
-                // try_send_event no bloquea, ignora si falla
+                // try_send_event no bloquea, se ignora si falla
                 client->try_send_event(event);
             }
         }

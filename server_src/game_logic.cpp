@@ -38,6 +38,9 @@ void GameLogic::process_commands() {
     }
 }
 
+// Identificamos qué autos van a expirar ANTES de actualizar y actualizamos los autos que NO van a
+// terminar y justo para cada auto de eso actualizamos y le mandamos el evento
+
 void GameLogic::simulate_world() {
     std::vector<int> about_to_expire;
     std::vector<int> all_clients;

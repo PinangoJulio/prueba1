@@ -49,7 +49,7 @@ El servidor utiliza múltiples threads:
 
 ### Sincronización
 - **NonBlockingQueue**: Para comandos del game loop
-- **BoundedBlockingQueue**: Para mensajes a enviar por cliente
+- **BoundedBlockingQueue**: Para mensajes a enviar por cliente (bounded, bloqueante en lectura, no bloqueante en escritura con `try_push`)
 - **ClientsMonitor**: Monitor thread-safe que protege la colección de clientes
 
 ## Lógica del Juego
@@ -68,10 +68,15 @@ El servidor utiliza múltiples threads:
 ## Decisiones de Diseño
 
 ### Separación de Responsabilidades
-- **GameLogic**: Contiene la lógica del juego
-- **GameLoop**: Orquesta el loop principal
-- **ClientsMonitor**: Maneja la colección de clientes con critical sections
-- **Acceptor**: Acepta conexiones
+- **GameLogic**: Contiene la lógica del juego (activar nitro, simular mundo)
+- **GameLoop**: Orquesta el loop principal sin bloquearse
+- **ClientsMonitor**: Maneja la colección de clientes con critical sections explícitas
+- **Acceptor**: Acepta conexiones (ownership del socket aceptador)
+
+### Justificación de Queues
+- **NonBlockingQueue (comandos)**: Unbounded y no bloqueante porque el gameloop no debería poder bloquearse esperando comandos. Se usa `try_pop()` para procesar todos los comandos disponibles sin esperar.
+- **BoundedBlockingQueue (eventos)**: Bounded para limitar memoria. Se usa `try_push()` en broadcast para no bloquear el gameloop si la queue de un cliente está llena. El sender usa `pop()` bloqueante porque debería esperar eventos para enviar.
+
 
 ## Compilación
 
@@ -83,8 +88,10 @@ make -f MakefileThreads wrapsocks=1
 
 ## Ejecucion de pruebas
 
+# Ejecutar casos de prueba
 ./run_tests.sh . casos/ multi-client no-valgrind 60 10 yes
 
+# Comparar salidas
 ./compare_outputs.sh casos/ salidas/
 
 ##  Implementación Realizada

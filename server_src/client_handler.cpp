@@ -38,7 +38,11 @@ void ClientHandler::receiver_loop() {
 
             if (cmd == CMD_ACTIVATE_NITRO) {
                 GameCommand game_cmd{client_id};
-                game_commands.push(std::move(game_cmd));
+                // Se usa try_push para no bloquear el receiver
+                if (!game_commands.try_push(std::move(game_cmd))) {
+                    // Queue cerrada, el servidor está cerrando
+                    break;
+                }
             }
         }
     } catch (const std::exception& e) {

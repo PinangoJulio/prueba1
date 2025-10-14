@@ -12,7 +12,7 @@
 #include "clients_monitor.h"
 #include "gameloop.h"
 
-
+// se puede MODIFICAR a conveniencia, Numero totalmente arbitrario
 constexpr size_t GAME_COMMANDS_QUEUE_CAPACITY = 100;
 
 

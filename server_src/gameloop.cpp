@@ -44,6 +44,5 @@ void GameLoop::handle_game_event(const GameEvent& game_event) {
         std::cout << game_event.message << std::endl;
     }
 
-    // Usar el método broadcast del monitor (Critical Section)
     clients_monitor.broadcast(game_event.event);
 }
